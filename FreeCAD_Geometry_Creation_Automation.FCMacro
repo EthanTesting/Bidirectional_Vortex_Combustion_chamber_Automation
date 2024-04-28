@@ -1,0 +1,239 @@
+# -*- coding: utf-8 -*-
+
+# Macro Begin: C:\Macro_File_Path_For_Free_CAD +++++++++++++++++++++++++++++++++++++++++++++++++
+import FreeCAD
+import ImportGui
+import Part
+import PartDesign
+import Sketcher
+
+# Input Section for the script
+# All dimensions in mm
+# Main Parameters
+Parameter_a_List = [40] # Combustor Internal radius
+Parameter_b_List = [25] # Exaust Internal radius
+Parameter_l_List = [100] # Length of combustor
+Parameter_IDAM_List = [6] # Internal Diameter of Ammonia inlets
+Parameter_IDAI_List = [35] # Internal Diameter of Air inlets
+Parameter_AMNUM_List = [8] # Number of ammonia inlets
+Parameter_Fillet_Radius = [10] # Fillet on the combustor
+Parameter_Exaust_Length_List = [30] # Default of 30mm exaust length
+# Above parameters setup as list where each list index relates to one geometry file.
+
+Saving_File_Path = "Put_File_Path_Here"
+# Make sure file path /s are this: / not \ and ends in/
+# Minor Parameters
+Air_Inlet_Length = 10
+Ammonia_Inlet_length = 40
+
+# Opening the Part design GUI to make sure that the script will run correctly.
+Gui.activateWorkbench("PartDesignWorkbench")
+
+if len(Parameter_a_List) == len(Parameter_b_List) and len(Parameter_a_List) == len(Parameter_IDAM_List) and len(Parameter_a_List) == len(Parameter_IDAI_List)and len(Parameter_a_List) == len(Parameter_l_List) and len(Parameter_a_List) == len(Parameter_AMNUM_List) and len(Parameter_a_List) == len(Parameter_Fillet_Radius) and len(Parameter_a_List) == len(Parameter_Exaust_Length_List):
+	for i in range(len(Parameter_a_List)):
+		# Creating a variable to hold the document name based off the input parameters		
+		DocName = "a" + str(Parameter_a_List[i]) + "b" + str(Parameter_b_List[i]) + "l" + str(Parameter_l_List[i]) + "IDAM" + str(Parameter_IDAM_List[i]) + "IDAI" + str(Parameter_IDAI_List[i]) + "AMNUM" + str(Parameter_AMNUM_List[i]) + "FC" + str(Parameter_Fillet_Radius[i]) + "EL" + str(Parameter_Exaust_Length_List[i])
+		DocName = DocName.replace(".","")
+
+		# Creating the document and saving it to a relevent file path.
+		App.newDocument(DocName)
+		
+		# Adding body to the file.
+		App.getDocument(DocName).addObject('PartDesign::Body','Body')
+		
+		# Finding the angle to revolvve for periodic boundry condition for combustor, air intake and ammonia intake
+		Angle_To_Revolve = (360 / (Parameter_AMNUM_List[i]))
+
+		#################################################
+		# Creating the Combustor Section
+		#################################################
+		# Sketching the Combustor Cross Section for half the combustor
+		App.getDocument(DocName).getObject('Body').newObject('Sketcher::SketchObject','Combustor_Sketch')
+		App.getDocument(DocName).getObject('Combustor_Sketch').Support = (App.getDocument(DocName).getObject('XZ_Plane'),[''])
+		App.getDocument(DocName).getObject('Combustor_Sketch').MapMode = 'FlatFace'
+
+		# Putting a square on the sketch
+		geoList = []
+		geoList.append(Part.LineSegment(App.Vector(0.000000,0.000000,0),App.Vector(24.692202,0.000000,0)))
+		geoList.append(Part.LineSegment(App.Vector(24.692202,0.000000,0),App.Vector(24.692202,42.202465,0)))
+		geoList.append(Part.LineSegment(App.Vector(24.692202,42.202465,0),App.Vector(0.000000,42.202465,0)))
+		geoList.append(Part.LineSegment(App.Vector(0.000000,42.202465,0),App.Vector(0.000000,0.000000,0)))
+		App.getDocument(DocName).getObject('Combustor_Sketch').addGeometry(geoList,False)
+		conList = []
+		conList.append(Sketcher.Constraint('Coincident',0,2,1,1))
+		conList.append(Sketcher.Constraint('Coincident',1,2,2,1))
+		conList.append(Sketcher.Constraint('Coincident',2,2,3,1))
+		conList.append(Sketcher.Constraint('Coincident',3,2,0,1))
+		conList.append(Sketcher.Constraint('Horizontal',0))
+		conList.append(Sketcher.Constraint('Horizontal',2))
+		conList.append(Sketcher.Constraint('Vertical',1))
+		conList.append(Sketcher.Constraint('Vertical',3))
+		App.getDocument(DocName).getObject('Combustor_Sketch').addConstraint(conList)
+		del geoList, conList
+
+		# Giving dimensions of combustor section (height and radius)
+		App.getDocument(DocName).getObject('Combustor_Sketch').addConstraint(Sketcher.Constraint('Coincident',0,1,-1,1)) 
+		App.getDocument(DocName).getObject('Combustor_Sketch').addConstraint(Sketcher.Constraint('DistanceY',3,2,3,1,Parameter_l_List[i]))
+		App.getDocument(DocName).getObject('Combustor_Sketch').addConstraint(Sketcher.Constraint('DistanceX',0,1,0,2,Parameter_a_List[i]))
+
+		# Revolving the sketch to use periodic boundry conditions
+		App.getDocument(DocName).getObject('Body').newObject('PartDesign::Revolution','Combustor_Revolution')
+		App.getDocument(DocName).getObject('Combustor_Revolution').Profile = App.getDocument(DocName).getObject('Combustor_Sketch')
+		App.getDocument(DocName).getObject('Combustor_Revolution').ReferenceAxis = (App.getDocument(DocName).getObject('Z_Axis'), [''])
+		App.getDocument(DocName).getObject('Combustor_Revolution').Angle = Angle_To_Revolve
+		App.getDocument(DocName).getObject('Combustor_Revolution').Reversed = 1
+		App.getDocument(DocName).getObject('Combustor_Sketch').Visibility = False
+		App.ActiveDocument.recompute()
+
+
+		#################################################
+		# Creating the Exaust Section
+		#################################################
+		# Sketching the Exaust Cross Section for half the combustor
+		App.getDocument(DocName).getObject('Body').newObject('Sketcher::SketchObject','Exaust_Sketch')
+		App.getDocument(DocName).getObject('Exaust_Sketch').Support = (App.getDocument(DocName).getObject('XZ_Plane'),[''])
+		App.getDocument(DocName).getObject('Exaust_Sketch').MapMode = 'FlatFace'
+
+		# Putting a square on the sketch
+		geoList = []
+		geoList.append(Part.LineSegment(App.Vector(0.000000,0.000000,0),App.Vector(32.364925,0.000000,0)))
+		geoList.append(Part.LineSegment(App.Vector(32.364925,0.000000,0),App.Vector(32.364925,-27.448948,0)))
+		geoList.append(Part.LineSegment(App.Vector(32.364925,-27.448948,0),App.Vector(0.000000,-27.448948,0)))
+		geoList.append(Part.LineSegment(App.Vector(0.000000,-27.448948,0),App.Vector(0.000000,0.000000,0)))
+		App.getDocument(DocName).getObject('Exaust_Sketch').addGeometry(geoList,False)
+		conList = []
+		conList.append(Sketcher.Constraint('Coincident',0,2,1,1))
+		conList.append(Sketcher.Constraint('Coincident',1,2,2,1))
+		conList.append(Sketcher.Constraint('Coincident',2,2,3,1))
+		conList.append(Sketcher.Constraint('Coincident',3,2,0,1))
+		conList.append(Sketcher.Constraint('Horizontal',0))
+		conList.append(Sketcher.Constraint('Horizontal',2))
+		conList.append(Sketcher.Constraint('Vertical',1))
+		conList.append(Sketcher.Constraint('Vertical',3))
+		App.getDocument(DocName).getObject('Exaust_Sketch').addConstraint(conList)
+		del geoList, conList
+
+		# Giving dimensions of Exaust section (height and radius)
+		App.getDocument(DocName).getObject('Exaust_Sketch').addConstraint(Sketcher.Constraint('Coincident',0,1,-1,1)) 
+		App.getDocument(DocName).getObject('Exaust_Sketch').addConstraint(Sketcher.Constraint('DistanceX',2,2,2,1,Parameter_b_List[i]))
+		App.getDocument(DocName).getObject('Exaust_Sketch').addConstraint(Sketcher.Constraint('DistanceY',1,2,1,1,Parameter_Exaust_Length_List[i]))
+
+		# Revolving the sketch to use periodic boundry conditions
+		App.getDocument(DocName).getObject('Body').newObject('PartDesign::Revolution','Exaust_Revolution')
+		App.getDocument(DocName).getObject('Exaust_Revolution').Profile = App.getDocument(DocName).getObject('Exaust_Sketch')
+		App.getDocument(DocName).getObject('Exaust_Revolution').ReferenceAxis = (App.getDocument(DocName).getObject('Z_Axis'), [''])
+		App.getDocument(DocName).getObject('Exaust_Revolution').Angle = Angle_To_Revolve
+		App.getDocument(DocName).getObject('Exaust_Revolution').Reversed = 1
+		App.getDocument(DocName).getObject('Exaust_Sketch').Visibility = False
+		App.ActiveDocument.recompute()
+
+
+		#################################################
+		# Creating the Air Intake Section
+		#################################################
+		# Sketching the Air intake Cross Section for half the combustor
+		App.getDocument(DocName).getObject('Body').newObject('Sketcher::SketchObject','AirInlet_Sketch')
+		App.getDocument(DocName).getObject('AirInlet_Sketch').Support = (App.getDocument(DocName).getObject('XZ_Plane'),[''])
+		App.getDocument(DocName).getObject('AirInlet_Sketch').MapMode = 'FlatFace'
+
+		# Getting sketch construction lines set
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addGeometry(Part.LineSegment(App.Vector(0.000000,0.000000,0),App.Vector(0.000000,83.080971,0)),False)
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('Coincident',0,1,-1,1)) 
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('PointOnObject',0,2,-2)) 
+		App.getDocument(DocName).getObject('AirInlet_Sketch').toggleConstruction(0)
+
+		# Drawing square on the sketch
+		geoList = []
+		geoList.append(Part.LineSegment(App.Vector(0.000000,83.080971,0),App.Vector(26.036877,83.080971,0)))
+		geoList.append(Part.LineSegment(App.Vector(26.036877,83.080971,0),App.Vector(26.036877,105.440086,0)))
+		geoList.append(Part.LineSegment(App.Vector(26.036877,105.440086,0),App.Vector(0.000000,105.440086,0)))
+		geoList.append(Part.LineSegment(App.Vector(0.000000,105.440086,0),App.Vector(0.000000,83.080971,0)))
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addGeometry(geoList,False)
+		conList = []
+		conList.append(Sketcher.Constraint('Coincident',1,2,2,1))
+		conList.append(Sketcher.Constraint('Coincident',2,2,3,1))
+		conList.append(Sketcher.Constraint('Coincident',3,2,4,1))
+		conList.append(Sketcher.Constraint('Coincident',4,2,1,1))
+		conList.append(Sketcher.Constraint('Horizontal',1))
+		conList.append(Sketcher.Constraint('Horizontal',3))
+		conList.append(Sketcher.Constraint('Vertical',2))
+		conList.append(Sketcher.Constraint('Vertical',4))
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(conList)
+		del geoList, conList
+
+		# Getting Dimensions added in
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('Coincident',1,1,0,2)) 
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('DistanceY',0,1,0,2,Parameter_l_List[i]))
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('DistanceY',4,2,4,1,Air_Inlet_Length))
+		App.getDocument(DocName).getObject('AirInlet_Sketch').addConstraint(Sketcher.Constraint('DistanceX',3,2,3,1,(Parameter_IDAI_List[i]/2)))
+
+		# Revolving the sketch to use periodic boundry conditions
+		App.getDocument(DocName).getObject('Body').newObject('PartDesign::Revolution','AirInlet_Revolution')
+		App.getDocument(DocName).getObject('AirInlet_Revolution').Profile = App.getDocument(DocName).getObject('AirInlet_Sketch')
+		App.getDocument(DocName).getObject('AirInlet_Revolution').ReferenceAxis = (App.getDocument(DocName).getObject('Z_Axis'), [''])
+		App.getDocument(DocName).getObject('AirInlet_Revolution').Angle = Angle_To_Revolve
+		App.getDocument(DocName).getObject('AirInlet_Revolution').Reversed = 1
+		App.getDocument(DocName).getObject('AirInlet_Sketch').Visibility = False
+		App.ActiveDocument.recompute()
+
+
+		#################################################
+		# Adding the Ammonia Inlets
+		#################################################
+		# Sketching one of the Ammonia Inlet Sections
+		App.getDocument(DocName).getObject('Body').newObject('Sketcher::SketchObject','AmmoniaInlet_Sketch')
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').Support = (App.getDocument(DocName).getObject('XZ_Plane'),[''])
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').MapMode = 'FlatFace'
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addGeometry(Part.LineSegment(App.Vector(0.000000,0.000000,0),App.Vector(93.963425,0.000000,0)),False)
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('Coincident',0,1,-1,1)) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('PointOnObject',0,2,-1)) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addGeometry(Part.LineSegment(App.Vector(93.963425,0.000000,0),App.Vector(93.963425,24.589563,0)),False)
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('Coincident',1,1,0,2)) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('Vertical',1)) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').toggleConstruction(0) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').toggleConstruction(1)
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addGeometry(Part.Circle(App.Vector(93.963425,24.589563,0),App.Vector(0,0,1),13.692539),False)
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('Coincident',2,3,1,2)) 
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('Diameter',2,Parameter_IDAM_List[i]))
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('DistanceY',1,1,1,2,(Parameter_IDAM_List[i]/2))) # Construction line in x diameter fix
+		App.getDocument(DocName).getObject('AmmoniaInlet_Sketch').addConstraint(Sketcher.Constraint('DistanceX',0,1,0,2,(Parameter_a_List[i]-(Parameter_IDAM_List[i]/2)))) # Construction Line in y diameter fix
+		# Extruding Section
+		App.getDocument(DocName).getObject('Body').newObject('PartDesign::Pad','AmmoniaInlet_Pad')
+		App.getDocument(DocName).getObject('AmmoniaInlet_Pad').Profile = App.getDocument(DocName).getObject('AmmoniaInlet_Sketch')
+		App.getDocument(DocName).getObject('AmmoniaInlet_Pad').Length = Ammonia_Inlet_length
+		App.ActiveDocument.recompute()
+
+		#################################################
+		# Adding fillets on the Combustor Face
+		#################################################
+		App.getDocument(DocName).getObject('Body').newObject('PartDesign::Fillet','Fillet')
+		App.getDocument(DocName).getObject('Fillet').Radius = Parameter_Fillet_Radius[i]
+		App.getDocument(DocName).getObject('Fillet').Base = (App.getDocument(DocName).getObject('AmmoniaInlet_Pad'),["Edge15"])
+		#App.getDocument(DocName).getObject('AmmoniaInlet_Pad').Visibility = False
+		App.ActiveDocument.recompute()
+
+		#################################################
+		# Saving Data
+		#################################################
+		# Creating folder to save file to
+		os.mkdir(os.path.join(Saving_File_Path,DocName))
+
+		# Saving File
+		App.getDocument(DocName).saveAs(Saving_File_Path + DocName + "/" + DocName +".FCStd")
+
+
+		# Exporting File for Ansys
+		__objs__ = []
+		__objs__.append(FreeCAD.getDocument(DocName).getObject("Body"))
+		if hasattr(ImportGui, "exportOptions"):
+		    options = ImportGui.exportOptions(Saving_File_Path + DocName +".step")
+		    ImportGui.export(__objs__,(Saving_File_Path + DocName + "/" + DocName +".step"), options)
+		else:
+		    ImportGui.export(__objs__,(Saving_File_Path + DocName + "/" + DocName +".step"))
+
+		del __objs__
+
+else:
+	print("Program has failed. Input list lengths do not match")
+
+ 
